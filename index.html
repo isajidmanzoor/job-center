@@ -139,6 +139,20 @@ textarea{
 
 /* ---------- alerts guide ---------- */
 .alert-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:14px;}
+.lj-status{color:var(--text-dimmer);font-size:13px;margin-bottom:16px;}
+.lj-list{display:flex;flex-direction:column;gap:12px;}
+.lj-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+.lj-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:6px;}
+.lj-title{font-weight:600;font-size:14.5px;}
+.lj-company{color:var(--text-dim);font-size:13px;margin-bottom:6px;}
+.lj-meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.lj-tag{font-family:var(--mono);font-size:10px;color:var(--text-dim);border:1px solid var(--border);padding:2px 8px;border-radius:10px;}
+.lj-tag.remote{color:var(--accent);border-color:var(--accent);}
+.lj-actions{display:flex;gap:10px;}
+.lj-btn{font-size:12px;border-radius:6px;padding:7px 12px;text-decoration:none;border:1px solid var(--border);color:var(--text-dim);cursor:pointer;background:none;}
+.lj-btn.primary{background:var(--accent);color:#08211d;border:none;font-weight:600;}
+.lj-btn:hover{border-color:var(--accent);color:var(--accent);}
+
 .alert-card h3{font-size:14.5px;margin-bottom:8px;}
 .alert-card p{color:var(--text-dim);font-size:13px;margin-bottom:10px;}
 .copy-line{
@@ -176,6 +190,10 @@ textarea{
       <button class="nav-btn" data-view="alerts">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
         <span class="label">Alerts</span>
+      </button>
+      <button class="nav-btn" data-view="livejobs">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span class="label">Live Jobs</span>
       </button>
     </nav>
     <div class="sidebar-foot" id="sidebarStats">Loading…</div>
@@ -277,6 +295,14 @@ textarea{
         <p>Set up a Job Alert in your profile settings with these keywords.</p>
         <div class="copy-line"><span id="rz-query">SQA Engineer, QA Automation, Software Tester</span><button data-copy="rz-query">Copy</button></div>
       </div>
+    </section>
+
+    <!-- LIVE JOBS VIEW -->
+    <section class="view" id="view-livejobs">
+      <h1>Live Jobs</h1>
+      <p class="sub">Auto-fetched from a public job board API, filtered to QA / testing / automation roles only.</p>
+      <div id="liveJobsStatus" class="lj-status">Loading live listings…</div>
+      <div id="liveJobsList" class="lj-list"></div>
     </section>
 
   </main>
@@ -476,6 +502,70 @@ document.getElementById('copyBtn').addEventListener('click', () => {
     setTimeout(() => btn.textContent = orig, 1500);
   });
 });
+
+/* ---------------- live jobs (public API, QA-filtered) ---------------- */
+const QA_KEYWORDS = ['qa','test','tester','testing','quality','sdet','automation','sqa'];
+
+function matchesQA(job){
+  const hay = (job.title + ' ' + (job.tags||[]).join(' ')).toLowerCase();
+  return QA_KEYWORDS.some(k => hay.includes(k));
+}
+
+async function loadLiveJobs(){
+  const statusEl = document.getElementById('liveJobsStatus');
+  const listEl = document.getElementById('liveJobsList');
+  statusEl.textContent = 'Loading live listings…';
+  listEl.innerHTML = '';
+  try{
+    const res = await fetch('https://www.arbeitnow.com/api/job-board-api');
+    const json = await res.json();
+    const all = json.data || [];
+    const matched = all.filter(matchesQA).slice(0, 20);
+
+    if (matched.length === 0){
+      statusEl.textContent = `Checked ${all.length} live listings — none matched QA/testing keywords right now. Try again later, or use the Alerts tab as your primary source.`;
+      return;
+    }
+    statusEl.textContent = `${matched.length} QA/testing-related listing(s) found just now.`;
+    listEl.innerHTML = matched.map((job, i) => `
+      <div class="lj-card">
+        <div class="lj-top">
+          <div>
+            <div class="lj-title">${escapeHtml(job.title)}</div>
+            <div class="lj-company">${escapeHtml(job.company_name)} — ${escapeHtml(job.location || '')}</div>
+          </div>
+        </div>
+        <div class="lj-meta">
+          ${job.remote ? '<span class="lj-tag remote">Remote</span>' : ''}
+          ${(job.tags||[]).slice(0,4).map(t => `<span class="lj-tag">${escapeHtml(t)}</span>`).join('')}
+        </div>
+        <div class="lj-actions">
+          <a class="lj-btn primary" href="${job.url}" target="_blank" rel="noopener">View & Apply</a>
+          <button class="lj-btn" data-add-live="${i}">Add to Tracker</button>
+        </div>
+      </div>
+    `).join('');
+
+    listEl.querySelectorAll('[data-add-live]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const job = matched[parseInt(btn.dataset.addLive, 10)];
+        applications.push({
+          id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+          company: job.company_name, role: job.title,
+          date: new Date().toISOString().slice(0,10), status: 'saved',
+          link: job.url, notes: 'Found via Live Jobs feed'
+        });
+        saveApplications();
+        btn.textContent = 'Added ✓';
+        btn.disabled = true;
+      });
+    });
+  }catch(e){
+    statusEl.textContent = 'Could not reach the live jobs feed right now — check your connection and try again.';
+  }
+}
+
+document.querySelector('[data-view="livejobs"]').addEventListener('click', loadLiveJobs);
 
 /* ---------------- alerts copy buttons ---------------- */
 document.querySelectorAll('[data-copy]').forEach(btn => {
