@@ -347,7 +347,7 @@ function renderTracker(){
   wrap.querySelectorAll('.status-select').forEach(sel => {
     sel.addEventListener('change', () => {
       const app = applications.find(a => a.id === sel.dataset.id);
-      if (app){ app.status = sel.value; sel.className = 'status-select ' + sel.value; saveApplications(); }
+      if (app){ app.status = sel.value; saveApplications(); renderTracker(); }
     });
   });
   wrap.querySelectorAll('[data-del]').forEach(btn => {
