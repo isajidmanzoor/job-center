@@ -522,84 +522,42 @@ function matchesQA(job){
 }
 
 let LIVE_JOBS_CACHE = [];
-let SOURCES_OK = 0, SOURCES_TOTAL = 3;
-
-async function fetchArbeitnow(){
-  const res = await fetch('https://www.arbeitnow.com/api/job-board-api');
-  const json = await res.json();
-  return (json.data || []).map(j => ({
-    title: j.title, company: j.company_name, location: j.location,
-    remote: !!j.remote, tags: j.tags || [], url: j.url,
-    created: j.created_at ? j.created_at * 1000 : 0, source: 'arbeitnow'
-  }));
-}
-
-async function fetchRemotive(){
-  const res = await fetch('https://remotive.com/api/remote-jobs?category=qa');
-  const json = await res.json();
-  return (json.jobs || []).map(j => ({
-    title: j.title, company: j.company_name, location: j.candidate_required_location,
-    remote: true, tags: j.tags || [], url: j.url,
-    created: j.publication_date ? Date.parse(j.publication_date) : 0, source: 'remotive'
-  }));
-}
-
-async function fetchRemoteOK(){
-  const res = await fetch('https://remoteok.com/api');
-  const json = await res.json();
-  return (json || []).filter(j => j.id).map(j => ({
-    title: j.position, company: j.company, location: j.location || 'Remote',
-    remote: true, tags: j.tags || [], url: j.url || ('https://remoteok.com/remote-jobs/' + j.id),
-    created: j.date ? Date.parse(j.date) : 0, source: 'remoteok'
-  }));
-}
-
-function dedupe(jobs){
-  const seen = new Set();
-  return jobs.filter(j => {
-    const key = (j.title + j.company).toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key); return true;
-  });
-}
 
 async function loadLiveJobs(){
   const statusEl = document.getElementById('liveJobsStatus');
   const listEl = document.getElementById('liveJobsList');
-  statusEl.textContent = 'Scanning 3 global sources…';
+  statusEl.textContent = 'Scanning global sources\u2026';
   listEl.innerHTML = '';
 
-  const results = await Promise.allSettled([fetchArbeitnow(), fetchRemotive(), fetchRemoteOK()]);
-  let all = [];
-  SOURCES_OK = 0;
-  results.forEach(r => { if (r.status === 'fulfilled'){ all = all.concat(r.value); SOURCES_OK++; } });
-
-  const totalScanned = all.length;
-  const matched = dedupe(all.filter(matchesQA)).sort((a,b) => b.created - a.created).slice(0, 30);
-  LIVE_JOBS_CACHE = matched;
-
-  renderLiveJobs(matched, totalScanned);
+  try{
+    const res = await fetch('/api/jobs');
+    const data = await res.json();
+    LIVE_JOBS_CACHE = data.jobs || [];
+    renderLiveJobs(LIVE_JOBS_CACHE, data.totalScanned || 0);
+  }catch(e){
+    statusEl.textContent = 'Could not reach the live jobs feed right now \u2014 try Refresh in a moment.';
+  }
 }
 
 function renderLiveJobs(matched, totalScanned){
   const statusEl = document.getElementById('liveJobsStatus');
   const listEl = document.getElementById('liveJobsList');
   const q = (document.getElementById('ljSearch').value || '').toLowerCase();
-  const filtered = q ? matched.filter(j => (j.title+j.company+j.location+j.tags.join(' ')).toLowerCase().includes(q)) : matched;
+  const filtered = q ? matched.filter(j => (j.title+j.company+j.location+(j.tags||[]).join(' ')).toLowerCase().includes(q)) : matched;
 
   if (matched.length === 0){
-    statusEl.textContent = `Scanned ${totalScanned} live listings worldwide — none matched QA/testing keywords right now. Try Refresh later, or use the Alerts tab as backup.`;
+    statusEl.textContent = `Scanned ${totalScanned} live listings worldwide \u2014 none matched QA/testing keywords right now. Try Refresh later, or use the Alerts tab as backup.`;
     listEl.innerHTML = '';
     return;
   }
-  statusEl.textContent = `${totalScanned} live listings scanned worldwide · ${matched.length} QA/testing match(es)${q ? ` · ${filtered.length} shown after filter` : ''}`;
+  statusEl.textContent = `${totalScanned} live listings scanned worldwide \u00b7 ${matched.length} QA/testing match(es)${q ? ` \u00b7 ${filtered.length} shown after filter` : ''}`;
 
   listEl.innerHTML = filtered.map((job, i) => `
     <div class="lj-card">
       <div class="lj-top">
         <div>
           <div class="lj-title">${escapeHtml(job.title)}</div>
-          <div class="lj-company">${escapeHtml(job.company)} — ${escapeHtml(job.location || '')}</div>
+          <div class="lj-company">${escapeHtml(job.company)} \u2014 ${escapeHtml(job.location || '')}</div>
         </div>
       </div>
       <div class="lj-meta">
@@ -623,7 +581,7 @@ function renderLiveJobs(matched, totalScanned){
         link: job.url, notes: 'Found via Live Jobs'
       });
       saveApplications();
-      btn.textContent = 'Added ✓';
+      btn.textContent = 'Added \u2713';
       btn.disabled = true;
     });
   });
