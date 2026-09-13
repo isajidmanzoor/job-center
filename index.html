@@ -306,7 +306,7 @@ textarea{
     <!-- LIVE JOBS VIEW -->
     <section class="view" id="view-livejobs">
       <h1>Live Jobs — Worldwide</h1>
-      <p class="sub">Auto-aggregated in real time from 3 public job board APIs (Arbeitnow · Remotive · RemoteOK), filtered to QA / testing / automation roles.</p>
+      <p class="sub">Live QA &amp; testing roles from around the world, pulled in automatically and filtered just for you.</p>
       <div class="lj-controls">
         <input id="ljSearch" placeholder="Filter results (e.g. 'remote', 'senior', 'python')..." />
         <button class="lj-btn" id="ljRefresh">↻ Refresh</button>
@@ -588,11 +588,11 @@ function renderLiveJobs(matched, totalScanned){
   const filtered = q ? matched.filter(j => (j.title+j.company+j.location+j.tags.join(' ')).toLowerCase().includes(q)) : matched;
 
   if (matched.length === 0){
-    statusEl.textContent = `${SOURCES_OK}/${SOURCES_TOTAL} sources reached, ${totalScanned} listings scanned — none matched QA/testing keywords right now. Try Refresh later, or use the Alerts tab as backup.`;
+    statusEl.textContent = `Scanned ${totalScanned} live listings worldwide — none matched QA/testing keywords right now. Try Refresh later, or use the Alerts tab as backup.`;
     listEl.innerHTML = '';
     return;
   }
-  statusEl.textContent = `${SOURCES_OK}/${SOURCES_TOTAL} sources reached · ${totalScanned} listings scanned worldwide · ${matched.length} QA/testing match(es)${q ? ` · ${filtered.length} shown after filter` : ''}`;
+  statusEl.textContent = `${totalScanned} live listings scanned worldwide · ${matched.length} QA/testing match(es)${q ? ` · ${filtered.length} shown after filter` : ''}`;
 
   listEl.innerHTML = filtered.map((job, i) => `
     <div class="lj-card">
@@ -601,7 +601,6 @@ function renderLiveJobs(matched, totalScanned){
           <div class="lj-title">${escapeHtml(job.title)}</div>
           <div class="lj-company">${escapeHtml(job.company)} — ${escapeHtml(job.location || '')}</div>
         </div>
-        <span class="lj-src ${job.source}">${job.source}</span>
       </div>
       <div class="lj-meta">
         ${job.remote ? '<span class="lj-tag remote">Remote</span>' : ''}
@@ -621,7 +620,7 @@ function renderLiveJobs(matched, totalScanned){
         id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
         company: job.company, role: job.title,
         date: new Date().toISOString().slice(0,10), status: 'saved',
-        link: job.url, notes: `Found via Live Jobs (${job.source})`
+        link: job.url, notes: 'Found via Live Jobs'
       });
       saveApplications();
       btn.textContent = 'Added ✓';
